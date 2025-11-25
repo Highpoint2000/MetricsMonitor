@@ -29,7 +29,7 @@ The following variables can be changed in the metricsmonitor.json config file:
     "sampleRate": 48000,          //  Enter the supported sample rate of the input audio card here: 48000 for displaying the FM audio spectrum / 96000 for displaying the FM baseband and 192000 for the MPX spectrum. The default is 48000.
     "stereoBoost": 1,             //  If the audio signal is too weak, a gain factor for the audio display can be set here (1 - default).
     "eqBoost": 1,                 //  If the audio signal is too weak, a gain factor for the equalizer display can be set here (1 - default).
-    "MODULE_SEQUENCE": "1, 2, 0"  // Here you can set the module display and order: 0 - Audio + Equalizer / 1 - Audio + PILOT/MPX/RDS / 2 - Spectrum Analyzer. Single values ​​or comma-separated values ​​can be entered.
+    "MODULE_SEQUENCE": "1, 2, 0"  // Here you can set the module display and order: 0 - Audio + Equalizer / 1 - Audio + PILOT/MPX/RDS / 2 - Spectrum Analyzer. Single values ​​or comma-separated values ​​can be entered ("1, 2, 0" - default).
 
 After making changes to the metricsmonitor.json script, the server must be restarted!!!
 
