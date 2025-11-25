@@ -18,7 +18,7 @@
   // Plugin version + update check configuration
   // ---------------------------------------------------------
 
-  const plugin_version  = '1.0';   // MetricsMonitor client version (adjust when you release a new version)
+  const plugin_version  = '1.1';   // MetricsMonitor client version (adjust when you release a new version)
   const updateInfo      = true;    // Enable or disable GitHub version check
 
   const plugin_name     = 'MetricsMonitor';
