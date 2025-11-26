@@ -4,8 +4,8 @@
 
 (() => {
 const sampleRate = 48000;    // Do not touch - this value is automatically updated via the config file
-const stereoBoost = 1;    // Do not touch - this value is automatically updated via the config file
-const eqBoost = 1;    // Do not touch - this value is automatically updated via the config file
+const stereoBoost = 1;       // Do not touch - this value is automatically updated via the config file
+const eqBoost = 1;           // Do not touch - this value is automatically updated via the config file
 
 
   ///////////////////////////////////////////////////////////////
@@ -23,6 +23,8 @@ const eqBoost = 1;    // Do not touch - this value is automatically updated via 
 
   let prevRdsState = false;
   let prevStereoState = false;
+  let prevTpState   = null;
+  let prevTaState   = null;
   let TextSocket = null;
 
   // Simple logging helpers for this header module
@@ -34,19 +36,17 @@ const eqBoost = 1;    // Do not touch - this value is automatically updated via 
     console.error('[MetricsHeader]', ...msg);
   }
 
+  // Helper: only change icon src when it actually changed
+  function setIconSrc(img, src) {
+    if (!img) return;
+    if (img.dataset.currentSrc === src) return;
+    img.src = src;
+    img.dataset.currentSrc = src;
+  }
+
   /**
-   * Handle incoming WebSocket messages for the text / status data.
-   *
-   * Expects a structure similar to:
-   * {
-   *   sig:  37.2,   // signal strength
-   *   pty:  10,     // PTY code
-   *   st:   true,   // stereo flag
-   *   ecc:  "NLD",  // ECC country code string or null
-   *   rds:  true,   // RDS present
-   *   tp:   1,      // TP bit
-   *   ta:   0       // TA bit
-   * }
+   * Handle incoming JSON messages from the WebSocket
+   * and update meters / icons / labels in the header.
    */
   function handleTextSocketMessage(message) {
     const meters = window.MetricsMeters;
@@ -61,7 +61,12 @@ const eqBoost = 1;    // Do not touch - this value is automatically updated via 
 
     // --- PTY label (Programme Type) ---
     if (message.pty !== undefined) {
-      const ptyText = PTY_TABLE[message.pty] || `PTY ${message.pty}`;
+      let ptyIndex = Number(message.pty);
+      if (Number.isNaN(ptyIndex) || ptyIndex < 0 || ptyIndex >= PTY_TABLE.length) {
+        ptyIndex = 0;
+      }
+      const ptyText = PTY_TABLE[ptyIndex];
+
       const ptyLabel = document.getElementById('ptyLabel');
       if (ptyLabel) {
         ptyLabel.textContent = ptyText;
@@ -77,37 +82,28 @@ const eqBoost = 1;    // Do not touch - this value is automatically updated via 
           ptyLabel.style.fontWeight = "normal";
         }
       }
-    }
 
-    // --- Stereo icon + Pilot level ---
-    if (message.st !== undefined) {
-      const stereoIcon = document.getElementById('stereoIcon');
-
-      // If we have a stereo flag “on”
-      if (message.st === true) {
-        // Stereo just turned on → initialize pilot level randomly
-        if (prevStereoState === false) {
-          levels.stereoPilot = Math.floor(Math.random() * (50 - 10 + 1)) + 10;
+      // Background color of the signal panel depending on PTY presence
+      const panel = document.getElementById('signalPanel');
+      if (panel) {
+        if (ptyText !== "PTY") {
+          panel.style.setProperty('background-color', 'var(--color-2-transparent)', 'important');
+        } else {
+          panel.style.setProperty('background-color', 'var(--color-1-transparent)', 'important');
         }
-        stereoIcon.classList.add('stereo-on');
-        stereoIcon.classList.remove('stereo-off');
-      } else {
-        // Mono → very low pilot level
-        stereoIcon.classList.add('stereo-off');
-        stereoIcon.classList.remove('stereo-on');
-        levels.stereoPilot = 3;
       }
-      prevStereoState = message.st === true;
     }
-    updateMeter('stereo-pilot-meter', levels.stereoPilot);
 
     // --- ECC (Extended Country Code) badge ---
     const eccWrapper = document.getElementById('eccWrapper');
     if (eccWrapper) {
       // Clear previous content each update
       eccWrapper.innerHTML = "";
-      if (message.ecc === null) {
-        // No ECC available → show grey "ECC"
+
+      const hasEcc = message.ecc !== undefined && message.ecc !== null && message.ecc !== "";
+
+      if (!hasEcc) {
+        // No ECC → small "No ECC" badge
         const noEcc = document.createElement('span');
         noEcc.textContent = 'ECC';
         noEcc.style.color = '#696969';
@@ -129,19 +125,35 @@ const eqBoost = 1;    // Do not touch - this value is automatically updated via 
           noEcc.textContent = 'ECC';
           noEcc.style.color = '#696969';
           noEcc.style.fontSize = '13px';
-          noEcc.style.fontWeight = 'bold';
-          noEcc.style.border = "1px solid #696969";
-          noEcc.style.borderRadius = "3px";
-          noEcc.style.padding = "0 2px";
-          noEcc.style.lineHeight = "1.2";
           eccWrapper.appendChild(noEcc);
         }
       }
     }
 
+    // --- Stereo indicator and stereo pilot "level" ---
+    const stereoIcon = document.getElementById('stereoIcon');
+    if (stereoIcon) {
+      if (message.st === true) {
+        // Stereo just turned on → initialize pilot level randomly
+        if (prevStereoState === false) {
+          levels.stereoPilot = Math.floor(Math.random() * (50 - 10 + 1)) + 10;
+        }
+        stereoIcon.classList.add('stereo-on');
+        stereoIcon.classList.remove('stereo-off');
+      } else {
+        // Mono → very low pilot level
+        stereoIcon.classList.add('stereo-off');
+        stereoIcon.classList.remove('stereo-on');
+        levels.stereoPilot = 3;
+      }
+      prevStereoState = message.st === true;
+    }
+    updateMeter('stereo-pilot-meter', levels.stereoPilot);
+
     // --- RDS indicator and "level" ---
     const rdsIcon = document.getElementById('rdsIcon');
-    if (message.rds === true) {
+    const hasRds = (message.rds === true);
+    if (hasRds) {
       // RDS just appeared → random level in a useful range
       if (prevRdsState === false) {
         levels.rds = Math.floor(Math.random() * (40 - 10 + 1)) + 10;
@@ -150,43 +162,36 @@ const eqBoost = 1;    // Do not touch - this value is automatically updated via 
       // No RDS → very low level
       levels.rds = 3;
     }
-    prevRdsState = message.rds === true;
-
     if (rdsIcon) {
-      const newRdsSrc = message.rds === true
+      const rdsSrc = hasRds
         ? '/js/plugins/MetricsMonitor/images/rds_on.png'
         : '/js/plugins/MetricsMonitor/images/rds_off.png';
-      if (rdsIcon.dataset.currentSrc !== newRdsSrc) {
-        rdsIcon.src = newRdsSrc;
-        rdsIcon.dataset.currentSrc = newRdsSrc;
-      }
+      setIconSrc(rdsIcon, rdsSrc);
     }
-
+    prevRdsState = hasRds;
     updateMeter('rds-meter', levels.rds);
 
     // --- TP (Traffic Programme) icon ---
     const tpIcon = document.getElementById('tpIcon');
+    const tpState = (message.tp === 1);
     if (tpIcon) {
-      const newTpSrc = message.tp === 1
+      const tpSrc = tpState
         ? '/js/plugins/MetricsMonitor/images/tp_on.png'
         : '/js/plugins/MetricsMonitor/images/tp_off.png';
-      if (tpIcon.dataset.currentSrc !== newTpSrc) {
-        tpIcon.src = newTpSrc;
-        tpIcon.dataset.currentSrc = newTpSrc;
-      }
+      setIconSrc(tpIcon, tpSrc);
     }
+    prevTpState = tpState;
 
     // --- TA (Traffic Announcement) icon ---
     const taIcon = document.getElementById('taIcon');
+    const taState = (message.ta === 1);
     if (taIcon) {
-      const newTaSrc = message.ta === 1
+      const taSrc = taState
         ? '/js/plugins/MetricsMonitor/images/ta_on.png'
         : '/js/plugins/MetricsMonitor/images/ta_off.png';
-      if (taIcon.dataset.currentSrc !== newTaSrc) {
-        taIcon.src = newTaSrc;
-        taIcon.dataset.currentSrc = newTaSrc;
-      }
+      setIconSrc(taIcon, taSrc);
     }
+    prevTaState = taState;
   }
 
   /**
@@ -204,13 +209,17 @@ const eqBoost = 1;    // Do not touch - this value is automatically updated via 
         logInfo("WebSocket connected.");
       });
 
-      TextSocket.addEventListener("message", (event) => {
-        const message = JSON.parse(event.data);
-        handleTextSocketMessage(message);
+      TextSocket.addEventListener("message", (evt) => {
+        try {
+          const data = JSON.parse(evt.data);
+          handleTextSocketMessage(data);
+        } catch (err) {
+          logError("Error parsing TextSocket message:", err);
+        }
       });
 
-      TextSocket.addEventListener("error", (error) => {
-        logError("TextSocket error:", error);
+      TextSocket.addEventListener("error", (err) => {
+        logError("TextSocket error:", err);
       });
 
       TextSocket.addEventListener("close", () => {
@@ -227,7 +236,7 @@ const eqBoost = 1;    // Do not touch - this value is automatically updated via 
 
   /**
    * Build and attach the header UI (ECC badge, stereo icon, PTY label,
-   * TP / TA / RDS icons) to the given icons bar element.
+   * TP/TA/RDS icons) into the given `iconsBar` container.
    */
   function initHeader(iconsBar) {
 
@@ -246,42 +255,51 @@ const eqBoost = 1;    // Do not touch - this value is automatically updated via 
     eccWrapper.style.whiteSpace = 'nowrap';
     leftGroup.appendChild(eccWrapper);
 
-    // --- Stereo icon ---
-    const stereoIcon = document.createElement('span');
-    stereoIcon.id = 'stereoIcon';
-    stereoIcon.className = 'stereo-icon stereo-off';
-    stereoIcon.title = 'Stereo';
-    leftGroup.appendChild(stereoIcon);
+    // Try to clone an existing ECC flag from TEF Logger UI, otherwise show "ECC"
+    const eccSpan = document.querySelector('.data-flag');
+    if (eccSpan && eccSpan.innerHTML.trim() !== "") {
+      eccWrapper.appendChild(eccSpan.cloneNode(true));
+    } else {
+      const noEcc = document.createElement('span');
+      noEcc.textContent = 'ECC';
+      noEcc.style.color = '#696969';
+      noEcc.style.fontSize = '13px';
+      eccWrapper.appendChild(noEcc);
+    }
 
-    // --- PTY label ---
+    // --- Stereo icon (cloned from original TEF Logger stereo container) ---
+    const stereoSource = document.querySelector('.stereo-container');
+    if (stereoSource) {
+      const stereoClone = stereoSource.cloneNode(true);
+      stereoClone.id = 'stereoIcon';
+      stereoClone.removeAttribute('style');  // use our own CSS
+      stereoClone.classList.add("tooltip");
+      stereoClone.setAttribute("data-tooltip", "Stereo / Mono toggle. Click to toggle.");
+      leftGroup.appendChild(stereoClone);
+    }
+
+    // --- PTY label placeholder ---
     const ptyLabel = document.createElement('span');
     ptyLabel.id = 'ptyLabel';
-    ptyLabel.className = 'pty-label';
     ptyLabel.textContent = 'PTY';
+    ptyLabel.style.color = '#696969';
+    ptyLabel.style.fontSize = '13px';
+    ptyLabel.style.width = '100px';
     leftGroup.appendChild(ptyLabel);
 
-    // --- Right group: TP / TA / RDS icons ---
-    const rightGroup = document.createElement('div');
-    rightGroup.style.display = 'flex';
-    rightGroup.style.alignItems = 'center';
-    rightGroup.style.gap = '6px';
-    rightGroup.style.marginLeft = 'auto';
-    iconsBar.appendChild(rightGroup);
-
-    const icons = [
-      { id: 'tpIcon',  title: 'TP',  on: 'tp_on.png',  off: 'tp_off.png' },
-      { id: 'taIcon',  title: 'TA',  on: 'ta_on.png',  off: 'ta_off.png' },
-      { id: 'rdsIcon', title: 'RDS', on: 'rds_on.png', off: 'rds_off.png' }
+    // --- TP / TA / RDS PNG icons ---
+    const iconMap = [
+      { id: 'tpIcon',  off: '/js/plugins/MetricsMonitor/images/tp_off.png' },
+      { id: 'taIcon',  off: '/js/plugins/MetricsMonitor/images/ta_off.png' },
+      { id: 'rdsIcon', off: '/js/plugins/MetricsMonitor/images/rds_off.png' }
     ];
-
-    icons.forEach(({ id, title, on, off }) => {
+    iconMap.forEach(({ id, off }) => {
       const img = document.createElement('img');
-      img.id = id;
       img.className = 'status-icon';
-      img.title = title;
+      img.id = id;
       img.alt = id;
-      img.src = off;
-      rightGroup.appendChild(img);
+      setIconSrc(img, off);
+      iconsBar.appendChild(img);
     });
 
     // Start WebSocket for text/status data
