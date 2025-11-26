@@ -3,11 +3,10 @@
 ///////////////////////////////////////////////////////////////
 
 (() => {
-const sampleRate = 48000;    // Do not touch - this value is automatically updated via the config file
+const sampleRate = 96000;    // Do not touch - this value is automatically updated via the config file
 const stereoBoost = 1;    // Do not touch - this value is automatically updated via the config file
 const eqBoost = 1;    // Do not touch - this value is automatically updated via the config file
-
-
+
   ///////////////////////////////////////////////////////////////
 
   // Feature flags depending on MPX sample rate
