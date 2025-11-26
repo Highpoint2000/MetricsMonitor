@@ -71,6 +71,7 @@ If the Headless TEF has an line audio output, the MPX output can be activated vi
 ## Important notes
 
 - To activate the audio output and equalizer, press the Play button!
+- To avoid distorting the measurement results, the volume control is deactivated after the plugin is installed!
 - The function of the modules depends on the sound input and the data rate used:
   0 = 48 kHz signal (mono or stereo) is sufficient.
   1 = Minimum 96 kHz signal is required for the pilot tone display; a 192 kHz signal is required for MPX and RDS display. For both sample rates, the receiver must support MPX output (activate via the menu if necessary).
