@@ -37,15 +37,15 @@ After making changes to the metricsmonitor.json script, the server must be resta
 ## Display modes
 
 ### Input: 48 kHz Mono/Stereo
-<img width="1067" height="259" alt="1a" src="https://github.com/user-attachments/assets/51504f0d-2c46-41d4-9f39-2f31b9bfbabb" />
+<img width="800" height="194" alt="1a" src="https://github.com/user-attachments/assets/51504f0d-2c46-41d4-9f39-2f31b9bfbabb" />
 
-     1 – Mono/Stereo without PILOT/MPX/RDS            2 – only spectrum to 48 kHz                0 – Mono/Stereo with Equalizer
+    1 – MO/ST without PILOT/MPX/RDS      2 – only spectrum to 48 kHz       0 – Mono/Stereo with Equalizer
   
 ### Input: 48 kHz MPX
 
 <img width="1213" height="294" alt="2" src="https://github.com/user-attachments/assets/e0d06c50-a484-4cc0-aaa7-7b93ac55e3d4" />
 
-          1 – Mono without PILOT/MPX/RDS         2 – only spectrum to 48 kHz with PILOT             0 – Mono with Equalizer
+          1 – Mono without PILOT/MPX/RDS     2 – only spectrum to 48 kHz with PILOT              0 – Mono with Equalizer
 
 ### Input: 96 kHz MPX
 
