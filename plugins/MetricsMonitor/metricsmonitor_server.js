@@ -1,8 +1,8 @@
 ///////////////////////////////////////////////////////////////
 //                                                           //
-//  METRICSMONITOR SERVER SCRIPT FOR FM-DX-WEBSERVER (V1.1)  //
+//  METRICSMONITOR SERVER SCRIPT FOR FM-DX-WEBSERVER (V1.1a) //
 //                                                           //
-//  by Highpoint               last update: 28.11.2025       //
+//  by Highpoint               last update: 03.12.2025       //
 //                                                           //
 //  https://github.com/Highpoint2000/metricsmonitor          //
 //                                                           //

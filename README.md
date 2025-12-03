@@ -5,10 +5,9 @@ FMDX Webserver Monitor plugin for displaying RDS and RF information, volume, equ
 
 <img width="1260" height="306" alt="start" src="https://github.com/user-attachments/assets/863202ce-d88d-46c7-9d9f-be3c52b49228" />
 
-## v1.1
+## v1.1a
 
-- MPX software switching for ESP32 TEF receivers has been added with the new [BETA firmware v2.20.5](https://github.com/Highpoint2000/MetricsMonitor/raw/refs/heads/main/firmware/TEF6686_ESP32_Dev_Beta_%20v2.20.5.zip). Three modes are available (see configuration options!).
-- Multiple WebSocket connections revised
+- Fixed incorrect display of TA, TP and RDS
 
 ## Installation notes
 
@@ -92,6 +91,11 @@ If you have any questions, would like to report problems, or have suggestions fo
 
 <details>
 <summary>History</summary>
+
+### v1.1
+
+- MPX software switching for ESP32 TEF receivers has been added with the new [BETA firmware v2.20.5](https://github.com/Highpoint2000/MetricsMonitor/raw/refs/heads/main/firmware/TEF6686_ESP32_Dev_Beta_%20v2.20.5.zip). Three modes are available (see configuration options!).
+- Multiple WebSocket connections revised
 
 ### v1.0a
 

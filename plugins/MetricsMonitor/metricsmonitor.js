@@ -1,8 +1,8 @@
 /////////////////////////////////////////////////////////////////
 ///                                                           ///
-///  METRICSMONITOR CLIENT SCRIPT FOR FM-DX-WEBSERVER (V1.1)  ///
+///  METRICSMONITOR CLIENT SCRIPT FOR FM-DX-WEBSERVER (V1.1a) ///
 ///                                                           ///
-///  by Highpoint               last update: 28.11.2025       ///
+///  by Highpoint               last update: 03.12.2025       ///
 ///                                                           ///
 ///  https://github.com/Highpoint2000/metricsmonitor          ///
 ///                                                           ///
@@ -22,7 +22,7 @@ const MODULE_SEQUENCE = [0,1,2];    // Do not touch - this value is automaticall
   // Plugin version + update check configuration
   // ---------------------------------------------------------
 
-  const plugin_version = '1.1'; // MetricsMonitor client version (adjust when you release a new version)
+  const plugin_version = '1.1a'; // MetricsMonitor client version (adjust when you release a new version)
   const updateInfo     = true;   // Enable or disable GitHub version check
 
   const plugin_name = 'MetricsMonitor';

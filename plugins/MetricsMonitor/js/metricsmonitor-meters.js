@@ -9,6 +9,7 @@ const eqBoost = 1;    // Do not touch - this value is automatically updated via 
 const fftSize = 512;    // Do not touch - this value is automatically updated via the config file
 const SpectrumAverageLevel = 30;    // Do not touch - this value is automatically updated via the config file
 const minSendIntervalMs = 15;    // Do not touch - this value is automatically updated via the config file
+const MPXmode = "off";    // Do not touch - this value is automatically updated via the config file
 
   ///////////////////////////////////////////////////////////////
 

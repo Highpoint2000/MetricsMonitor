@@ -10,7 +10,7 @@ const fftSize = 512;    // Do not touch - this value is automatically updated vi
 const SpectrumAverageLevel = 30;    // Do not touch - this value is automatically updated via the config file
 const minSendIntervalMs = 15;    // Do not touch - this value is automatically updated via the config file
 const MPXmode = "off";    // Do not touch - this value is automatically updated via the config file
-
+
   ///////////////////////////////////////////////////////////////
 
   // PTY code → human-readable label mapping
@@ -30,9 +30,9 @@ const MPXmode = "off";    // Do not touch - this value is automatically updated 
   let prevStereoState = false;
   // When true, L1 is active → force mono display
   let forcedMonoByL1 = false;
-  
-  let lastForcedState  = null;     // null | true | false
-  let lastVisibleState = null;     // "mono" | "stereo" | "locked"
+
+  // Previous RDS state (for ramping meter on change)
+  let prevRdsState = false;
 
   // Simple logging helpers
   function logInfo(...msg) {
@@ -86,12 +86,14 @@ const MPXmode = "off";    // Do not touch - this value is automatically updated 
       c1.style.opacity = '1';
       c1.style.display = '';
       c1.style.filter  = '';
-	  c1.marginLeft    = '4px';
+      c1.style.marginLeft = '0px';
+      // fixed per request
     }
     if (c2) {
       c2.style.opacity = '0';
       c2.style.display = 'none';
       c2.style.filter  = '';
+	  c2.style.marginLeft = '0px';
     }
   }
 
@@ -131,8 +133,8 @@ const MPXmode = "off";    // Do not touch - this value is automatically updated 
       icon.style.pointerEvents = 'none';
       icon.style.cursor        = 'default';
 	  if (prevStereoState) {
-		icon.style.marginLeft    = '8px';
-		icon.style.marginRight    = '-4px';
+		icon.style.marginLeft    = '4px';
+		icon.style.marginRight    = '0px';
 	  } else {
 		icon.style.marginLeft    = '4px';
 		icon.style.marginRight    = '0px';
@@ -145,62 +147,41 @@ const MPXmode = "off";    // Do not touch - this value is automatically updated 
     applyMonoCircles(dimForced);
   }
 
-function applyForcedMonoDisplay() {
-  showMonoSymbol(true);
-
-  // Log only once when switching to locked mono
-  if (lastVisibleState !== "locked") {
-    logInfo("Stereo header indicator forced to MONO (L1 active).");
-    lastVisibleState = "locked";
+  function applyForcedMonoDisplay() {
+    showMonoSymbol(true);
+    // logInfo("Stereo header indicator forced to MONO (L1 active).");
   }
-}
 
-function applyRealStereoDisplayFromPrev() {
-  const icon = getStereoIcon();
-  resetIconStyle(icon);
+  function applyRealStereoDisplayFromPrev() {
+    const icon = getStereoIcon();
+    resetIconStyle(icon);
 
-  if (prevStereoState) {
-    showStereoSymbol();
-    if (lastVisibleState !== "stereo") {
+    if (prevStereoState) {
+      showStereoSymbol();
       logInfo("Stereo header indicator restored to STEREO (L0, real signal).");
-      lastVisibleState = "stereo";
-    }
-  } else {
-    showMonoSymbol(false);
-    if (lastVisibleState !== "mono") {
+    } else {
+      showMonoSymbol(false);
       logInfo("Stereo header indicator restored to MONO (L0, real signal).");
-      lastVisibleState = "mono";
     }
   }
-}
 
+  // Called from metricsmonitor.js after sending L0 / L1
+  function setMonoLockFromMode(cmdRaw) {
+    const cmd = String(cmdRaw).trim().toUpperCase();
 
-function setMonoLockFromMode(cmdRaw) {
-  const cmd = String(cmdRaw).trim().toUpperCase();
-
-  if (cmd === "L1") {
-    forcedMonoByL1 = true;
-    if (lastForcedState !== true) {
+    if (cmd === "L1") {
+      forcedMonoByL1 = true;
       logInfo('L1 from client – forcing stereo indicator to MONO.');
-      lastForcedState = true;
-    }
-    applyForcedMonoDisplay();
-  }
-  else if (cmd === "L0") {
-    const wasLocked = forcedMonoByL1;
-    forcedMonoByL1 = false;
-
-    if (lastForcedState !== false) {
+      applyForcedMonoDisplay();
+    } else if (cmd === "L0") {
+      const wasLocked = forcedMonoByL1;
+      forcedMonoByL1 = false;
       logInfo('L0 from client – restoring stereo indicator to real mono/stereo state.');
-      lastForcedState = false;
-    }
-
-    if (wasLocked) {
-      applyRealStereoDisplayFromPrev();
+      if (wasLocked) {
+        applyRealStereoDisplayFromPrev();
+      }
     }
   }
-}
-
 
   /**
    * Handle incoming JSON messages from the WebSocket
@@ -252,25 +233,25 @@ function setMonoLockFromMode(cmdRaw) {
       }
     }
 
-if (message.st !== undefined) {
-  const isStereo = (message.st === true || message.st === 1);
+    // --- Stereo / Mono indicator (message.st) ---
+    if (message.st !== undefined) {
+      const isStereo = (message.st === true || message.st === 1);
 
-  prevStereoState = isStereo;
+      // remember real state for later restore on L0
+      prevStereoState = isStereo;
 
-  if (forcedMonoByL1) {
-    // No logs here → forced state handled above
-    applyForcedMonoDisplay();
-  } else {
-    if (isStereo) {
-      showStereoSymbol();
-      lastVisibleState = "stereo";
-    } else {
-      showMonoSymbol(false);
-      lastVisibleState = "mono";
+      if (forcedMonoByL1) {
+        // L1 active → immer Mono-Symbol, egal was st sendet
+        applyForcedMonoDisplay();
+      } else {
+        // Real display in L0
+        if (isStereo) {
+          showStereoSymbol();
+        } else {
+          showMonoSymbol(false);
+        }
+      }
     }
-  }
-}
-
 
     // --- ECC (Extended Country Code) badge ---
     const eccWrapper = document.getElementById('eccWrapper');
@@ -278,10 +259,34 @@ if (message.st !== undefined) {
       // Clear previous content each update
       eccWrapper.innerHTML = "";
 
-      const hasEcc = message.ecc !== undefined && message.ecc !== null && message.ecc !== "";
+      // Log incoming ECC value for debugging
+      // logInfo("ECC update received:", message.ecc);
+
+      // Decide if there is a usable ECC flag.
+      // If .data-flag is missing or empty → no ECC.
+      // Additionally, if .data-flag contains an <i> with class 'flag-sm-UN' → treat as no ECC.
+      const eccSpan = document.querySelector('.data-flag');
+      const eccSpanHasContent = eccSpan && eccSpan.innerHTML && eccSpan.innerHTML.trim() !== "";
+
+      let eccSpanIsPlaceholderUN = false;
+      if (eccSpanHasContent) {
+        const iElem = eccSpan.querySelector('i');
+        if (iElem && iElem.className) {
+          // check whether the flag element indicates UN placeholder (class contains 'flag-sm-UN')
+          const classes = iElem.className.split(/\s+/);
+          if (classes.includes('flag-sm-UN') || classes.some(c => c === 'flag-sm-UN')) {
+            eccSpanIsPlaceholderUN = true;
+          }
+        }
+      }
+
+      const hasEcc = eccSpanHasContent && !eccSpanIsPlaceholderUN && message.ecc !== undefined && message.ecc !== null && message.ecc !== "";
+
+      // logInfo("Computed hasEcc:", hasEcc, "eccSpanIsPlaceholderUN:", eccSpanIsPlaceholderUN);
 
       if (!hasEcc) {
         // No ECC → small "No ECC" badge
+        // logInfo("No ECC value found or placeholder UN → showing grey 'ECC' placeholder.");
         const noEcc = document.createElement('span');
         noEcc.textContent = 'ECC';
         noEcc.style.color = '#696969';
@@ -294,17 +299,60 @@ if (message.st !== undefined) {
         eccWrapper.appendChild(noEcc);
       } else {
         // ECC present → try to reuse existing ECC flag (if available)
-        const eccSpan = document.querySelector('.data-flag');
+        logInfo(".data-flag element query result:", eccSpan);
+        if (eccSpan) {
+          const inner = eccSpan.innerHTML ? eccSpan.innerHTML.trim() : "";
+          logInfo(".data-flag innerHTML length:", inner.length, "preview:", inner.substring(0,120));
+        }
         if (eccSpan && eccSpan.innerHTML.trim() !== "") {
+          logInfo("Cloning .data-flag to eccWrapper.");
           eccWrapper.appendChild(eccSpan.cloneNode(true));
         } else {
           // Fallback: simple grey "ECC"
+          logInfo("No usable .data-flag found or it's empty → showing fallback 'ECC'.");
           const noEcc = document.createElement('span');
           noEcc.textContent = 'ECC';
           noEcc.style.color = '#696969';
           noEcc.style.fontSize = '13px';
           eccWrapper.appendChild(noEcc);
         }
+      }
+    }
+
+    // --- RDS ---
+    // Accept either boolean true or numeric 1 for "on"
+    if (message.rds !== undefined) {
+      const rdsIcon = document.getElementById('rdsIcon');
+      const rdsOn = (message.rds === true || message.rds === 1);
+      if (rdsOn) {
+        if (prevRdsState === false) {
+          // bump meter on change to "on"
+          levels.rds = Math.floor(Math.random() * (40 - 10 + 1)) + 10;
+        }
+        setIconSrc(rdsIcon, '/js/plugins/MetricsMonitor/images/rds_on.png');
+      } else {
+        levels.rds = 3;
+        setIconSrc(rdsIcon, '/js/plugins/MetricsMonitor/images/rds_off.png');
+      }
+      prevRdsState = rdsOn;
+      updateMeter('rds-meter', levels.rds);
+    }
+
+    // --- TP ---
+    if (message.tp !== undefined) {
+      const tpIcon = document.getElementById('tpIcon');
+      const tpOn = (message.tp === 1 || message.tp === true);
+      if (tpIcon) {
+        setIconSrc(tpIcon, tpOn ? '/js/plugins/MetricsMonitor/images/tp_on.png' : '/js/plugins/MetricsMonitor/images/tp_off.png');
+      }
+    }
+
+    // --- TA ---
+    if (message.ta !== undefined) {
+      const taIcon = document.getElementById('taIcon');
+      const taOn = (message.ta === 1 || message.ta === true);
+      if (taIcon) {
+        setIconSrc(taIcon, taOn ? '/js/plugins/MetricsMonitor/images/ta_on.png' : '/js/plugins/MetricsMonitor/images/ta_off.png');
       }
     }
   }
@@ -373,9 +421,26 @@ if (message.st !== undefined) {
 
     // Try to clone an existing ECC flag from TEF Logger UI, otherwise show "ECC"
     const eccSpan = document.querySelector('.data-flag');
-    if (eccSpan && eccSpan.innerHTML.trim() !== "") {
+    logInfo("initHeader: .data-flag query result:", eccSpan);
+
+    // Decide whether eccSpan is usable or a UN placeholder:
+    const eccSpanHasContent = eccSpan && eccSpan.innerHTML && eccSpan.innerHTML.trim() !== "";
+    let eccSpanIsPlaceholderUN = false;
+    if (eccSpanHasContent) {
+      const iElem = eccSpan.querySelector('i');
+      if (iElem && iElem.className) {
+        const classes = iElem.className.split(/\s+/);
+        if (classes.includes('flag-sm-UN') || classes.some(c => c === 'flag-sm-UN')) {
+          eccSpanIsPlaceholderUN = true;
+        }
+      }
+    }
+
+    if (eccSpanHasContent && !eccSpanIsPlaceholderUN) {
+      logInfo("initHeader: cloning existing .data-flag into eccWrapper.");
       eccWrapper.appendChild(eccSpan.cloneNode(true));
     } else {
+      logInfo("initHeader: no usable .data-flag found or it's placeholder UN → adding placeholder 'ECC'.");
       const noEcc = document.createElement('span');
       noEcc.textContent = 'ECC';
       noEcc.style.color = '#696969';
