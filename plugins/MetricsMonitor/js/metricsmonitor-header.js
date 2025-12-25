@@ -184,7 +184,7 @@ const EnableSpectrumOnLoad = false;    // Do not touch - this value is automatic
           }
       }
 
-      setIconSrc(stereoIcon, `/js/plugins/MetricsMonitor/images/${iconName}`);
+      setIconSrc(stereoIcon, `js/plugins/MetricsMonitor/images/${iconName}`);
     }
 
     // --- ECC Badge ---
@@ -245,8 +245,8 @@ if (message.rds !== undefined) {
 
   const rdsIcon = document.getElementById('rdsIcon');
   setIconSrc(rdsIcon, rdsOn
-    ? '/js/plugins/MetricsMonitor/images/rds_on.png'
-    : '/js/plugins/MetricsMonitor/images/rds_off.png'
+    ? 'js/plugins/MetricsMonitor/images/rds_on.png'
+    : 'js/plugins/MetricsMonitor/images/rds_off.png'
   );
   
     const panel = document.getElementById('signalPanel');
@@ -266,7 +266,7 @@ if (message.rds !== undefined) {
       const tpIcon = document.getElementById('tpIcon');
       const tpOn = (message.tp === 1 || message.tp === true);
       if (tpIcon) {
-        setIconSrc(tpIcon, tpOn ? '/js/plugins/MetricsMonitor/images/tp_on.png' : '/js/plugins/MetricsMonitor/images/tp_off.png');
+        setIconSrc(tpIcon, tpOn ? 'js/plugins/MetricsMonitor/images/tp_on.png' : 'js/plugins/MetricsMonitor/images/tp_off.png');
       }
     }
 
@@ -275,7 +275,7 @@ if (message.rds !== undefined) {
       const taIcon = document.getElementById('taIcon');
       const taOn = (message.ta === 1 || message.ta === true);
       if (taIcon) {
-        setIconSrc(taIcon, taOn ? '/js/plugins/MetricsMonitor/images/ta_on.png' : '/js/plugins/MetricsMonitor/images/ta_off.png');
+        setIconSrc(taIcon, taOn ? 'js/plugins/MetricsMonitor/images/ta_on.png' : 'js/plugins/MetricsMonitor/images/ta_off.png');
       }
     }
   }
@@ -411,7 +411,7 @@ stereoImg.addEventListener('click', () => {
 
 
     // Initial state
-    setIconSrc(stereoImg, '/js/plugins/MetricsMonitor/images/stereo_off.png');
+    setIconSrc(stereoImg, 'js/plugins/MetricsMonitor/images/stereo_off.png');
     leftGroup.appendChild(stereoImg);
 
     // --- PTY Label ---
@@ -425,9 +425,9 @@ stereoImg.addEventListener('click', () => {
 
     // --- Status Icons (TP, TA, RDS) ---
     const iconMap = [
-      { id: 'tpIcon',  off: '/js/plugins/MetricsMonitor/images/tp_off.png' },
-      { id: 'taIcon',  off: '/js/plugins/MetricsMonitor/images/ta_off.png' },
-      { id: 'rdsIcon', off: '/js/plugins/MetricsMonitor/images/rds_off.png' }
+      { id: 'tpIcon',  off: 'js/plugins/MetricsMonitor/images/tp_off.png' },
+      { id: 'taIcon',  off: 'js/plugins/MetricsMonitor/images/ta_off.png' },
+      { id: 'rdsIcon', off: 'js/plugins/MetricsMonitor/images/rds_off.png' }
     ];
     iconMap.forEach(({ id, off }) => {
       const img = document.createElement('img');
