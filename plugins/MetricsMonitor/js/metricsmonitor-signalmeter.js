@@ -331,6 +331,7 @@ document.head.appendChild(style);
 
       lastMultipathProcessTime: 0,
       prevFreq: 0,
+      sigBuffer: [],
 
       unit: (window.MetricsMonitor && typeof window.MetricsMonitor.getSignalUnit === 'function')
         ? (window.MetricsMonitor.getSignalUnit() || 'dbf').toLowerCase()
@@ -421,9 +422,12 @@ document.head.appendChild(style);
       broadcastSig(baseValue) {
         const v = Number(baseValue);
         if (!isFinite(v)) return;
-        this.latestSigBase = v;
+        this.sigBuffer.push(v);
+        if (this.sigBuffer.length > 8) this.sigBuffer.shift();
+        const avg = this.sigBuffer.reduce((a, b) => a + b, 0) / this.sigBuffer.length;
+        this.latestSigBase = avg;
         for (const inst of this.instances.values()) {
-          try { inst._onSig(v); } catch {}
+          try { inst._onSig(avg); } catch {}
         }
       },
 
