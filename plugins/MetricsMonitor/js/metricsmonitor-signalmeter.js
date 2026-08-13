@@ -358,6 +358,7 @@ document.head.appendChild(style);
           if (!this.msgListenerAttached) {
             this.msgListenerAttached = true;
             ws.addEventListener('message', (evt) => {
+              if (document.hidden) return; // Prevent page freeze when running as background tab
               try {
                 const msg = JSON.parse(evt.data);
 
