@@ -1071,6 +1071,11 @@ try {
   pluginsApi = require("./../../server/plugins_api");
 } catch (e) {}
 
+let helpers = null;
+try {
+  helpers = require("./../../server/helpers");
+} catch (e) {}
+
 function isBannedIp(ip) {
   const banlist = pluginsApi?.getServerConfig?.()?.webserver?.banlist;
   if (!ip || !Array.isArray(banlist)) return false;
@@ -1079,6 +1084,15 @@ function isBannedIp(ip) {
     const bannedIp = Array.isArray(entry) ? entry[0] : entry;
     return bannedIp === ip || bannedIp === plainIp;
   });
+}
+
+// Webserver v1.4.1+ checks the whole proxy chain and multi-IP ban entries. Older versions,
+// or a future change to helpers.isBanned, fall back to the local check instead of failing.
+function isBannedRequest(request) {
+  try {
+    if (typeof helpers?.isBanned === "function") return !!helpers.isBanned(request);
+  } catch (e) {}
+  return isBannedIp(request.headers["x-forwarded-for"] || request.socket?.remoteAddress);
 }
 
 function startMetricsSocket(onViewerMessage) {
@@ -1103,8 +1117,7 @@ function startMetricsSocket(onViewerMessage) {
       otherUpgradeListeners.forEach((listener) => listener.call(httpServer, request, socket, head));
       return;
     }
-    const clientIp = request.headers["x-forwarded-for"] || request.socket?.remoteAddress;
-    if (isBannedIp(clientIp)) {
+    if (isBannedRequest(request)) {
       socket.destroy();
       return;
     }
