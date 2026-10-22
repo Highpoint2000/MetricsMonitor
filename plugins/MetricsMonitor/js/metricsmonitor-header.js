@@ -5,7 +5,7 @@
 //  by Highpoint               last update: 22.10.2026       //
 //                                                           //
 //  Thanks for support by                                    //
-//  Jeroen Platenkamp, Bkram, Wötkylä, AmateurAudioDude      //
+//  Jeroen Platenkamp, Bkram, Wötkylä, AmateurAudioDude      // 
 //  GOR and Bojcha                                           //
 //                                                           //
 //  https://github.com/Highpoint2000/metricsmonitor          //

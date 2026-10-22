@@ -6,7 +6,7 @@
 //                                                           //
 //  Thanks for support by                                    //
 //  Jeroen Platenkamp, Bkram, Wötkylä, AmateurAudioDude      //
-//  GOR and Bojcha                                           //
+//  GOR and Bojcha                                           // 
 //                                                           //
 //  https://github.com/Highpoint2000/metricsmonitor          //
 //                                                           //

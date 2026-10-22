@@ -4,7 +4,7 @@
 //                                                           //
 //  by Highpoint               last update: 22.10.2026       //
 //                                                           //
-//  Thanks for support by                                    //
+//  Thanks for support by                                    // 
 //  Jeroen Platenkamp, Bkram, Wötkylä, AmateurAudioDude,     //
 //  GOR and Bojcha                                           //
 //                                                           //
