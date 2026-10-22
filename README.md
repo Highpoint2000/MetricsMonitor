@@ -14,6 +14,8 @@ FMDX Webserver Monitor plugin for displaying RDS and RF information, volume, equ
 - Skip signalmeter DOM updates while page is hidden
 - Fixed an issue where the signal strength readout (dBf/dBµV/dBm) would occasionally display erratic, unsmoothed values after page load, causing the number to jump instantly rather than transition gradually with signal changes
 
+Many thanks to AmateurAudioDude for these code adjustments!
+
 You can find the current manual here:
 https://highpoint.fmdx.org/manuals/MetricsMonitor-Documentation.html
 
