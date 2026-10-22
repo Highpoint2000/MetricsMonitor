@@ -8,7 +8,11 @@ FMDX Webserver Monitor plugin for displaying RDS and RF information, volume, equ
 
 ## v2.8b
 
-- Auto-Patcher has been enhanced to prevent spam classifications for the local IP address (127.0.0.1), including in new web server versions from 1.4.1 onwards.
+- Create /data_plugins/metricsmonitor WebSocket
+- Fix MetricsMonitor freezing after a WebSocket reconnect
+- Added no-filter to SIGNAL panel to stop the blur flickering in Firefox
+- Skip signalmeter DOM updates while page is hidden
+- Fixed an issue where the signal strength readout (dBf/dBµV/dBm) would occasionally display erratic, unsmoothed values after page load, causing the number to jump instantly rather than transition gradually with signal changes
 
 You can find the current manual here:
 https://highpoint.fmdx.org/manuals/MetricsMonitor-Documentation.html
