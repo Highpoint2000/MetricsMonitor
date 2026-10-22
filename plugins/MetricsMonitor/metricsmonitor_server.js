@@ -543,7 +543,7 @@ function patchHelpersForLocalhostBypass() {
 
     if (!fs.existsSync(helpersPath)) {
       logWarn(
-        "[MPX] helpers.js not found, cannot patch antispam."
+        "[MPX] helpers.js not found, cannot patch antispamProtection()."
       );
       return;
     }
@@ -555,32 +555,26 @@ function patchHelpersForLocalhostBypass() {
       return;
     }
 
-    // Try finding the new function name first (newer versions), then fallback to the old one
-    let fnIndex = content.indexOf("function createAntispam(");
-    let funcName = "createAntispam()";
-    
-    if (fnIndex === -1) {
-      fnIndex = content.indexOf("function antispamProtection(");
-      funcName = "antispamProtection()";
-    }
+    // Locate the function (Partial match to ignore added/removed arguments in new versions)
+    const fnIndex = content.indexOf("function antispamProtection(");
 
     if (fnIndex === -1) {
       logWarn(
-        "[MPX] Neither createAntispam() nor antispamProtection() found in helpers.js - skipping localhost patch."
+        "[MPX] antispamProtection() not found in helpers.js - skipping localhost patch."
       );
       return;
     }
 
-    // Extract a snippet right after the function declaration to search for the variable declaration
-    const searchSnippet = content.slice(fnIndex, fnIndex + 800);
+    // Extract a small snippet right after the function declaration to search for the variable declaration
+    const searchSnippet = content.slice(fnIndex, fnIndex + 500);
     
-    // Regex to match "const command = <anything>;"
+    // Regex to match "const command = <anything>;" (Handles both the old and the new .replace(...) code)
     const cmdRegex = /const\s+command\s*=\s*[^\n]+;/;
     const match = searchSnippet.match(cmdRegex);
 
     if (!match) {
       logWarn(
-        `[MPX] 'command' variable definition not found in ${funcName} - skipping localhost patch.`
+        "[MPX] 'command' variable definition not found in antispamProtection() - skipping localhost patch."
       );
       return;
     }
@@ -605,7 +599,7 @@ function patchHelpersForLocalhostBypass() {
     fs.writeFileSync(helpersPath, content, "utf8");
 
     logInfo(
-      `[MPX] helpers.js patched: localhost exempt in ${funcName}. Please restart the webserver!`
+      "[MPX] helpers.js patched: localhost exempt in antispamProtection(). Please restart the webserver!"
     );
   } catch (err) {
     logWarn(
