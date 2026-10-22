@@ -6,12 +6,9 @@ FMDX Webserver Monitor plugin for displaying RDS and RF information, volume, equ
 
 
 
-## v2.8a
+## v2.8b
 
-- Shared hub: shared WebSocket hub, all three client modules delegate to window.MetricsMpxHub, one connection instead of three (reduce network bandwidth usage)
-- IdleShutdown: config option to end MPXCapture binary when idle, with heartbeat tracking, debounced SIGTERM, restart on demand, correct Linux process group kill
-
-Many thanks to AmateurAudioDude for these code adjustments!
+- Auto-Patcher has been enhanced to prevent spam classifications for the local IP address (127.0.0.1), including in new web server versions from 1.4.1 onwards.
 
 You can find the current manual here:
 https://highpoint.fmdx.org/manuals/MetricsMonitor-Documentation.html
@@ -174,6 +171,13 @@ If you have any questions, would like to report problems, or have suggestions fo
 
 <details>
 <summary>History</summary>
+
+### v2.8a
+
+- Shared hub: shared WebSocket hub, all three client modules delegate to window.MetricsMpxHub, one connection instead of three (reduce network bandwidth usage)
+- IdleShutdown: config option to end MPXCapture binary when idle, with heartbeat tracking, debounced SIGTERM, restart on demand, correct Linux process group kill
+
+Many thanks to AmateurAudioDude for these code adjustments!
 
 ### v2.8
 
