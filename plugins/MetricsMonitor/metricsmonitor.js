@@ -18,7 +18,7 @@ window.MetricsMpxHub = (function() {
   var u = window.location;
   var port = u.port || (u.protocol === "https:" ? "443" : "80");
   var proto = u.protocol === "https:" ? "wss:" : "ws:";
-  var WS_URL = proto + "//" + u.hostname + ":" + port + "/data_plugins";
+  var WS_URL = proto + "//" + u.hostname + ":" + port + "/data_plugins/metricsmonitor";
 
   var ws = null;
   var reconnectTimer = null;

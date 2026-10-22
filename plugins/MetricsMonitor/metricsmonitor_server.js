@@ -526,89 +526,6 @@ function sequenceContainsId(seq, id) {
 }
 
 // ====================================================================================
-//  SYSTEM PATCHING
-//  These functions modify other server files to ensure compatibility.
-// ====================================================================================
-
-/**
- * PATCH HELPERS.JS
- * Adds an exemption for Localhost (127.0.0.1) to bypass the Anti-Spam protection.
- * This is critical because the plugin communicates via internal WebSocket on localhost.
- */
-const LOCALHOST_PATCH_MARKER = "// MM_LOCALHOST_SPAM_BYPASS:";
-
-function patchHelpersForLocalhostBypass() {
-  try {
-    const helpersPath = path.join(__dirname, "./../../server/helpers.js");
-
-    if (!fs.existsSync(helpersPath)) {
-      logWarn(
-        "[MPX] helpers.js not found, cannot patch antispamProtection()."
-      );
-      return;
-    }
-
-    let content = fs.readFileSync(helpersPath, "utf8");
-
-    if (content.includes(LOCALHOST_PATCH_MARKER)) {
-      // Already patched
-      return;
-    }
-
-    // Locate the function (Partial match to ignore added/removed arguments in new versions)
-    const fnIndex = content.indexOf("function antispamProtection(");
-
-    if (fnIndex === -1) {
-      logWarn(
-        "[MPX] antispamProtection() not found in helpers.js - skipping localhost patch."
-      );
-      return;
-    }
-
-    // Extract a small snippet right after the function declaration to search for the variable declaration
-    const searchSnippet = content.slice(fnIndex, fnIndex + 500);
-    
-    // Regex to match "const command = <anything>;" (Handles both the old and the new .replace(...) code)
-    const cmdRegex = /const\s+command\s*=\s*[^\n]+;/;
-    const match = searchSnippet.match(cmdRegex);
-
-    if (!match) {
-      logWarn(
-        "[MPX] 'command' variable definition not found in antispamProtection() - skipping localhost patch."
-      );
-      return;
-    }
-
-    // Calculate the exact insertion position right after the matched "const command = ...;" line
-    const insertPos = fnIndex + match.index + match[0].length;
-
-    const insertion = `
-  ${LOCALHOST_PATCH_MARKER} allow internal server apps on localhost
-  const isLocalhost =
-    clientIp === "127.0.0.1" ||
-    clientIp === "::1" ||
-    clientIp === "::ffff:127.0.0.1" ||
-    (clientIp && clientIp.replace(/^::ffff:/, '') === "127.0.0.1");
-
-  if (isLocalhost) {
-    // no spam/bot checks for local server applications
-    return command;
-  }`;
-
-    content = content.slice(0, insertPos) + insertion + content.slice(insertPos);
-    fs.writeFileSync(helpersPath, content, "utf8");
-
-    logInfo(
-      "[MPX] helpers.js patched: localhost exempt in antispamProtection(). Please restart the webserver!"
-    );
-  } catch (err) {
-    logWarn(
-      `[MPX] Failed to patch helpers.js for localhost exemption: ${err.message}`
-    );
-  }
-}
-
-// ====================================================================================
 //  CLIENT-SIDE FILE UPDATES & DEPLOYMENT
 // ====================================================================================
 
@@ -1142,6 +1059,78 @@ updateAllClientFiles();
 setupFileWatcher();
 
 // ====================================================================================
+//  WEBSOCKET SERVER
+//  Dedicated /data_plugins/metricsmonitor socket, so MPX frames reach only
+//  MetricsMonitor viewers and don't pass through core's /data_plugins relay.
+// ====================================================================================
+
+const MM_WS_ROUTE = "/data_plugins/metricsmonitor";
+
+let pluginsApi = null;
+try {
+  pluginsApi = require("./../../server/plugins_api");
+} catch (e) {}
+
+let helpers = null;
+try {
+  helpers = require("./../../server/helpers");
+} catch (e) {}
+
+function isBannedIp(ip) {
+  const banlist = pluginsApi?.getServerConfig?.()?.webserver?.banlist;
+  if (!ip || !Array.isArray(banlist)) return false;
+  const plainIp = ip.replace(/^::ffff:/, "");
+  return banlist.some((entry) => {
+    const bannedIp = Array.isArray(entry) ? entry[0] : entry;
+    return bannedIp === ip || bannedIp === plainIp;
+  });
+}
+
+// Webserver v1.4.1+ checks the whole proxy chain and multi-IP ban entries. Older versions,
+// or a future change to helpers.isBanned, fall back to the local check instead of failing.
+function isBannedRequest(request) {
+  try {
+    if (typeof helpers?.isBanned === "function") return !!helpers.isBanned(request);
+  } catch (e) {}
+  return isBannedIp(request.headers["x-forwarded-for"] || request.socket?.remoteAddress);
+}
+
+function startMetricsSocket(onViewerMessage) {
+  const httpServer = pluginsApi?.getHttpServer?.();
+  if (!httpServer) {
+    logError(`[MPX] Webserver does not provide its HTTP server (plugins_api) - ${MM_WS_ROUTE} unavailable.`);
+    return null;
+  }
+
+  const wss = new WebSocket.Server({ noServer: true, perMessageDeflate: true, maxPayload: 4096 });
+
+  wss.on("connection", (ws) => {
+    ws.on("message", (raw) => onViewerMessage(raw.toString()));
+    ws.on("error", () => {});
+  });
+
+  // Core destroys upgrades for paths it doesn't know, so this route is taken before core sees it
+  const otherUpgradeListeners = httpServer.listeners("upgrade");
+  httpServer.removeAllListeners("upgrade");
+  httpServer.on("upgrade", (request, socket, head) => {
+    if (request.url !== MM_WS_ROUTE) {
+      otherUpgradeListeners.forEach((listener) => listener.call(httpServer, request, socket, head));
+      return;
+    }
+    if (isBannedRequest(request)) {
+      socket.destroy();
+      return;
+    }
+    wss.handleUpgrade(request, socket, head, (ws) => {
+      wss.emit("connection", ws, request);
+    });
+  });
+
+  logInfo(`[MPX] MetricsMonitor WebSocket ready on ${MM_WS_ROUTE}`);
+  return wss;
+}
+
+// ====================================================================================
 //  MAIN SERVER LOGIC START
 //  This is where the actual signal processing loop begins.
 // ====================================================================================
@@ -1151,24 +1140,11 @@ if (!ENABLE_MPX && MPX_INPUT_CARD === ""){
     `[MPX] MODULE_SEQUENCE = ${MODULE_SEQUENCE} - ` +
     "MPX capture & server-side MPX processing are disabled."
   );
+  startMetricsSocket(() => {});
 } else {
 
-  // Apply patches
-  patchHelpersForLocalhostBypass();
-
   let SAMPLE_RATE = CONFIG_SAMPLE_RATE;
-  
-  let SERVER_PORT = 8080;
-  try {
-    if (mainConfig?.webserver?.webserverPort) {
-      SERVER_PORT = parseInt(mainConfig.webserver.webserverPort, 10);
-      if (isNaN(SERVER_PORT)) SERVER_PORT = 8080;
-    }
-  } catch (e) {
-    SERVER_PORT = 8080;
-  }
 
-  logInfo(`[MPX] Using webserver port from config.json - ${SERVER_PORT}`);
   logInfo(
     `[MPX] sampleRate from metricsmonitor.json - ${CONFIG_SAMPLE_RATE} Hz`
   );
@@ -1276,16 +1252,6 @@ if (!ENABLE_MPX && MPX_INPUT_CARD === ""){
     "[MPX] MPX server started (Fast & Smooth v2.1, Peak/Pilot/RDS Time Domain, Tilt Correction, Server Visual Sync)."
   );
 
-  // ====================================================================================
-  //  WEBSOCKET SERVER
-  //  Handles data distribution to clients.
-  // ====================================================================================
-  
-  let dataPluginsWs = null;
-  let reconnectTimer = null;
-  let backpressureHits = 0;
-  const MAX_BACKPRESSURE_HITS = 200;
-  
   // Heartbeat tracking for Spectrum, Scope & Meters
   let lastSpectrumHeartbeat = 0;
   let spectrumIsActive = false;
@@ -1297,63 +1263,17 @@ if (!ENABLE_MPX && MPX_INPUT_CARD === ""){
   // Idle shutdown state
   let intentionalShutdown = false;
   let shutdownTimer = null;
-  
 
-  function connectDataPluginsWs() {
-    const url = `ws://127.0.0.1:${SERVER_PORT}/data_plugins`;
-
-    if (
-      dataPluginsWs &&
-      (dataPluginsWs.readyState === WebSocket.OPEN ||
-        dataPluginsWs.readyState === WebSocket.CONNECTING)
-    ) {
-      return;
+  // Viewers only send heartbeats
+  const mmWss = startMetricsSocket((str) => {
+    if (str.includes('"spectrum_heartbeat"')) {
+      lastSpectrumHeartbeat = Date.now();
+    } else if (str.includes('"scope_heartbeat"')) {
+      lastScopeHeartbeat = Date.now();
+    } else if (str.includes('"meters_heartbeat"')) {
+      lastMetersHeartbeat = Date.now();
     }
-
-    logInfo("[MPX] Connecting to /data_plugins:", url);
-
-    dataPluginsWs = new WebSocket(url);
-    backpressureHits = 0;
-
-    dataPluginsWs.on("open", () => {
-      logInfo("[MPX] Connected to /data_plugins WebSocket.");
-      backpressureHits = 0;
-    });
-
-    dataPluginsWs.on("close", () => {
-      logInfo("[MPX] /data_plugins WebSocket closed - retrying in 5 seconds.");
-      dataPluginsWs = null;
-
-      if (!reconnectTimer) {
-        reconnectTimer = setTimeout(() => {
-          reconnectTimer = null;
-          connectDataPluginsWs();
-        }, 5000);
-      }
-    });
-
-    dataPluginsWs.on("error", (err) => {
-      logError("[MPX] /data_plugins WebSocket error:", err);
-    });
-
-    // Listen for client messages (Heartbeats from Spectrum AND Scope)
-    // FIX: Do not use JSON.parse() here, as the webserver reflects our 30KB payload back!
-    // Parsing a 30KB string 30 times a second creates massive memory leaks (OOM).
-    dataPluginsWs.on("message", (raw) => {
-        try {
-            const str = raw.toString();
-            if (str.includes('"spectrum_heartbeat"')) {
-                lastSpectrumHeartbeat = Date.now();
-            } else if (str.includes('"scope_heartbeat"')) {
-                lastScopeHeartbeat = Date.now();
-            } else if (str.includes('"meters_heartbeat"')) {
-                lastMetersHeartbeat = Date.now();
-            }
-        } catch(e) {}
-    });
-  }
-
-  connectDataPluginsWs();
+  });
 
   // ====================================================================================
   //  INPUT HANDLERS (Dual Mode Support)
@@ -1639,27 +1559,10 @@ if (!ENABLE_MPX && MPX_INPUT_CARD === ""){
   const wsMessageQueue = [];
 
   setInterval(() => {
-      // 1. Check WebSocket connection
-      if (!dataPluginsWs || dataPluginsWs.readyState !== WebSocket.OPEN) {
-          // Clear the queue to prevent a massive backlog burst upon reconnection
-          wsMessageQueue.length = 0; 
-          return;
-      }
-      
-      // Prevent indefinite queue growth if shifting somehow fails or socket blocks forever
+      // Prevent indefinite queue growth if shifting somehow fails
       if (wsMessageQueue.length > 100) {
           wsMessageQueue.shift(); // Drop the oldest frame to avoid memory leak
       }
-      
-      // 2. Check Backpressure
-      if (dataPluginsWs.bufferedAmount > MAX_WS_BACKLOG_BYTES) {
-          if (++backpressureHits >= MAX_BACKPRESSURE_HITS) {
-              try { dataPluginsWs.terminate(); } catch {}
-              dataPluginsWs = null;
-          }
-          return;
-      }
-      backpressureHits = 0;
 
       // -----------------------------------------------------------------------
       // PREPARE DATA
@@ -1776,13 +1679,14 @@ if (!ENABLE_MPX && MPX_INPUT_CARD === ""){
       // Process the queue and send out payloads that have surpassed the specified VisualDelayMs
       while (wsMessageQueue.length > 0 && (now - wsMessageQueue[0].time) >= VISUAL_DELAY_MS) {
           const item = wsMessageQueue.shift();
-          
-          try {
-              // Final safety check just in case the connection state changed during the loop
-              if (dataPluginsWs && dataPluginsWs.readyState === WebSocket.OPEN) {
-                  dataPluginsWs.send(item.payload, () => {});
+          if (!mmWss) continue;
+
+          // A viewer that can't keep up skips frames instead of building a backlog
+          mmWss.clients.forEach((client) => {
+              if (client.readyState === WebSocket.OPEN && client.bufferedAmount <= MAX_WS_BACKLOG_BYTES) {
+                  try { client.send(item.payload, () => {}); } catch (e) {}
               }
-          } catch(e) {}
+          });
       }
 
   }, SPECTRUM_SEND_INTERVAL);
