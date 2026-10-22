@@ -301,7 +301,7 @@ const PeakColorFixed = "rgb(251, 174, 38)";    // Do not touch - this value is a
     if (TextSocket && TextSocket.readyState !== WebSocket.CLOSED) return;
 
     try {
-      TextSocket = await window.socketPromise;
+      TextSocket = window.MetricsSocket;
 
       TextSocket.addEventListener("open", () => {
         logInfo("WebSocket connected.");

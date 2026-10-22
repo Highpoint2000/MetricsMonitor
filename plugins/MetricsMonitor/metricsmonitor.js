@@ -62,6 +62,64 @@ window.MetricsMpxHub = (function() {
   };
 }());
 
+// Socket-like object that follows core's window.socket across reconnects, window.socketPromise only ever resolves to the first socket.
+window.MetricsSocket = (function() {
+  var listeners = {};
+  var attachHandlers = [];
+  var current = null;
+  var retryTimer = null;
+
+  function watch() {
+    if (!retryTimer) retryTimer = setInterval(attach, 1000);
+  }
+
+  function eachListener(fn) {
+    Object.keys(listeners).forEach(function(type) {
+      listeners[type].forEach(function(listener) { fn(type, listener); });
+    });
+  }
+
+  function attach() {
+    var socket = window.socket;
+    if (!socket || socket.readyState === WebSocket.CLOSED || socket.readyState === WebSocket.CLOSING) {
+      watch();
+      return;
+    }
+    if (retryTimer) { clearInterval(retryTimer); retryTimer = null; }
+    if (socket === current) return;
+    if (current) {
+      current.removeEventListener("close", watch);
+      eachListener(function(type, listener) { current.removeEventListener(type, listener); });
+    }
+    current = socket;
+    socket.addEventListener("close", watch);
+    eachListener(function(type, listener) { socket.addEventListener(type, listener); });
+    attachHandlers.forEach(function(fn) { try { fn(socket); } catch(e) {} });
+  }
+
+  return {
+    // Never CLOSED, so retry-on-close code doesn't add its listeners a second time
+    get readyState() {
+      attach();
+      return current && current.readyState === WebSocket.OPEN ? WebSocket.OPEN : WebSocket.CONNECTING;
+    },
+    send: function(data) {
+      attach();
+      if (current) current.send(data);
+    },
+    addEventListener: function(type, fn) {
+      (listeners[type] = listeners[type] || new Set()).add(fn);
+      if (current) current.addEventListener(type, fn);
+      attach();
+    },
+    onAttach: function(fn) {
+      attachHandlers.push(fn);
+      if (current) { try { fn(current); } catch(e) {} }
+      else attach();
+    }
+  };
+}());
+
 (() => {
 const sampleRate = 192000;    // Do not touch - this value is automatically updated via the config file
 const MPXmode = "auto";    // Do not touch - this value is automatically updated via the config file
@@ -328,12 +386,10 @@ function patchTextSocketSend(ws) {
 
   async function ensureTextSocket() {
     try {
-      if (!window.socketPromise) return null;
-      TextSocket = await window.socketPromise;
-      if (!TextSocket) return null;
+      TextSocket = window.MetricsSocket;
 
       if (!textSocketReady) {
-        mmLog("log", "TextSocket available via socketPromise.");
+        mmLog("log", "TextSocket available via MetricsSocket.");
         TextSocket.addEventListener("message", (evt) => {
           try {
             const msg = JSON.parse(evt.data);
@@ -345,7 +401,7 @@ function patchTextSocketSend(ws) {
           } catch (e) {}
         });
         textSocketReady = true;
-        patchTextSocketSend(TextSocket);
+        window.MetricsSocket.onAttach(patchTextSocketSend);
       }
       return TextSocket;
     } catch (err) {

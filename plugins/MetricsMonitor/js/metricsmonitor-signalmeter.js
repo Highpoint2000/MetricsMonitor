@@ -348,10 +348,7 @@ document.head.appendChild(style);
         if (this.connecting) return this.connecting;
 
         this.connecting = (async () => {
-          while (!window.socketPromise) {
-            await new Promise(r => setTimeout(r, 400));
-          }
-          const ws = await window.socketPromise;
+          const ws = window.MetricsSocket;
           if (!ws) return null;
           this.socket = ws;
 
@@ -778,7 +775,7 @@ document.head.appendChild(style);
 
       // Signal Panel
       const signalPanel = document.createElement('div');
-      signalPanel.className = 'panel-33 no-bg-phone signal-panel-layout';
+      signalPanel.className = 'panel-33 no-bg-phone no-filter signal-panel-layout';
 
       if (useLegacyIds) {
         signalPanel.innerHTML = `

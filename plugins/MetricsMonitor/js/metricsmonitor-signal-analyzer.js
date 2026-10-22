@@ -253,13 +253,9 @@ const MeterTiltCalibration = -900;    // Do not touch - this value is automatica
 
     const attach = async () => {
       if (hub.hasSocketListener) return;
-      if (!window.socketPromise) {
-        setTimeout(attach, 750);
-        return;
-      }
 
       try {
-        hub.socket = await window.socketPromise;
+        hub.socket = window.MetricsSocket;
         if (!hub.socket) {
           setTimeout(attach, 750);
           return;
