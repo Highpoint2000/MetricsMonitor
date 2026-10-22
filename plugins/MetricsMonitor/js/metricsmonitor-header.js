@@ -308,6 +308,7 @@ const PeakColorFixed = "rgb(251, 174, 38)";    // Do not touch - this value is a
       });
 
       TextSocket.addEventListener("message", (evt) => {
+        if (document.hidden || window.MetricsMonitor?.isRenderStalled?.()) return;
         try {
           const data = JSON.parse(evt.data);
           handleTextSocketMessage(data);

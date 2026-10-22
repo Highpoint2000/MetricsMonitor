@@ -234,6 +234,11 @@ const MeterTiltCalibration = -900;    // Do not touch - this value is automatica
   window.MetricsMonitor = window.MetricsMonitor || {};
   window.MetricsMonitor.Config = CONFIG;
 
+  // Phones can stop rendering with the screen off without setting document.hidden
+  let lastFrameTime = performance.now();
+  (function stampFrame() { lastFrameTime = performance.now(); requestAnimationFrame(stampFrame); })();
+  window.MetricsMonitor.isRenderStalled = () => performance.now() - lastFrameTime > 1000;
+
   window.MetricsMonitor._logBuffer = window.MetricsMonitor._logBuffer || [];
   const LOG_MAX_ENTRIES = 500;
   const LOG_PREFIX = "[MetricsMonitor]";
